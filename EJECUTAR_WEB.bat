@@ -1,0 +1,6 @@
+@echo off
+echo Instalando dependencias...
+pip install -r requirements.txt
+echo Iniciando Servidor del Parqueadero...
+python app.py
+pause

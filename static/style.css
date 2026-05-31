@@ -1,0 +1,412 @@
+body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+*, *:before, *:after { box-sizing: inherit; }
+.navbar { background-color: #b40000; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+.logo { font-size: 20px; font-weight: bold; }
+.user-info { display: flex; align-items: center; gap: 20px; }
+.badge-caja { padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+.badge-abierta { background-color: #28a745; color: white; }
+.badge-cerrada { background-color: #dc3545; color: white; }
+.btn-logout { color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 4px; font-size: 14px; }
+.btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+.app-container { display: flex; flex: 1; overflow: hidden; }
+.sidebar { width: 220px; background-color: #fff; border-right: 1px solid #ddd; padding: 15px; display: flex; flex-direction: column; gap: 5px; }
+.menu-item { background: none; border: none; padding: 12px 15px; text-align: left; font-size: 15px; font-weight: 600; color: #555; cursor: pointer; border-radius: 6px; }
+.menu-item:hover { background-color: #f5f5f5; }
+.menu-item.active { background-color: #b40000; color: white; }
+
+.main-content { flex: 1; padding: 25px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+.header-actions { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: flex-end; gap: 15px; }
+.input-group { display: flex; flex-direction: column; gap: 5px; }
+.input-group label { font-size: 12px; font-weight: bold; color: #888; }
+.input-big { font-size: 24px; font-weight: bold; padding: 8px; width: 180px; border: 1px solid #ccc; border-radius: 4px; text-transform: uppercase; }
+.select-big { font-size: 18px; padding: 12px; height: 50px; border: 1px solid #ccc; border-radius: 4px; }
+
+.btn-action { height: 50px; padding: 0 25px; border: none; border-radius: 4px; color: white; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; }
+.btn-red { background-color: #b40000; }
+.btn-red:hover { background-color: #900000; }
+.btn-dark { background-color: #333; }
+.btn-dark:hover { background-color: #000; }
+
+.table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th { background-color: #fafafa; padding: 15px; text-align: left; border-bottom: 2px solid #eee; color: #666; font-size: 14px; }
+td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 15px; }
+tr:hover { background-color: #f9f9f9; }
+
+.receipt-panel { width: 350px; background-color: #fffde6; border-left: 1px solid #ddd; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+.receipt-panel h3 { margin-top: 0; color: #666; font-size: 16px; border-bottom: 1px solid #edd; padding-bottom: 10px; }
+#areaRecibo { flex: 1; font-family: 'Courier New', Courier, monospace; font-size: 13px; font-weight: bold; background: transparent; border: none; resize: none; padding: 10px; line-height: 1.4; outline: none; }
+.panel-actions { border-top: 1px solid #edd; padding-top: 15px; }
+.btn-print { width: 100%; padding: 12px; background-color: #444; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+.btn-print:hover { background-color: #222; }
+
+/* ESTILO LOGGRO RESTOBAR */
+.loggro-filters {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.filter-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+.filter-row input, .filter-row select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 180px;
+    color: #666;
+}
+.btn-loggro-red {
+    background-color: #b40000;
+    color: white;
+    border: none;
+    padding: 8px 25px;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.table-container-loggro {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+.tabla-loggro {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.tabla-loggro th {
+    background-color: #f8f8f8;
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 2px solid #eee;
+    color: #333;
+}
+.tabla-loggro td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    color: #555;
+}
+.fila-abierta {
+    background-color: #e8f5e9; /* Verde muy claro para cajas abiertas */
+}
+.btn-ver-loggro {
+    background-color: #b40000;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-ver-facturas {
+    background-color: white;
+    color: #b40000;
+    border: 1px solid #b40000;
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.btn-icon-loggro {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    color: #b40000;
+}
+
+@media print {
+    body * { visibility: hidden; }
+    #areaRecibo, #areaRecibo * { visibility: visible; }
+    #areaRecibo { position: absolute; left: 0; top: 0; width: 300px; height: auto; }
+}
+
+/* MODAL CUADRE DE CAJA */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+.modal-content { background-color: #fefefe; margin: 5% auto; padding: 0; border: 1px solid #888; width: 550px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border-radius: 12px; position: relative; overflow: hidden; }
+.modal-header { padding: 15px; text-align: center; border-bottom: 1px solid #eee; }
+.modal-header h2 { margin: 0; font-size: 22px; color: #333; }
+.modal-header p { margin: 5px 0 0; color: #888; font-size: 13px; }
+.modal-body { padding: 25px; }
+.modal-info-grid { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 25px; }
+.info-item label { display: block; font-size: 18px; font-weight: bold; color: #333; margin-bottom: 5px; }
+.info-item span { font-size: 16px; color: #555; }
+.ventas-titulo { font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+.modal-footer { padding: 15px; display: flex; justify-content: center; gap: 10px; border-top: 1px solid #eee; }
+.btn-modal { padding: 10px 25px; border: none; border-radius: 4px; color: white; font-weight: bold; cursor: pointer; min-width: 120px; text-transform: uppercase; }
+.btn-red-modal { background-color: #b40000; }
+.btn-red-modal:hover { background-color: #900000; }
+.close-modal { position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; color: #aaa; }
+
+.tabla-cuadre { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+.tabla-cuadre th { text-align: left; border-bottom: 1px solid #ddd; padding: 10px; color: #666; font-size: 14px; }
+.tabla-cuadre td { padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 15px; }
+.fila-total { font-weight: bold; background-color: #f9f9f9; }
+
+.input-cuadre {
+    width: 100px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: bold;
+    text-align: right;
+}
+
+/* Loggro Style Modal Elements */
+.select-loggro, .input-loggro {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    color: #555;
+    font-size: 14px;
+}
+.form-group-loggro {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+.form-group-loggro label {
+    min-width: 170px;
+    font-weight: bold;
+    color: #444;
+}
+.btn-plus-loggro {
+    background-color: white;
+    border: 1px solid #aaa;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tabla-loggro-simple {
+    width: 100%;
+    border-collapse: collapse;
+}
+.tabla-loggro-simple th {
+    background: #f8f8f8;
+    text-align: left;
+    padding: 12px;
+    font-size: 13px;
+    color: #888;
+}
+.tabla-loggro-simple td {
+    padding: 10px 12px;
+    border-top: 1px solid #eee;
+}
+.tabla-loggro-ventas {
+    width: 100%;
+    border-collapse: collapse;
+}
+.tabla-loggro-ventas td {
+    padding: 18px;
+    border-bottom: 1px solid #eee;
+    font-weight: bold;
+    color: #555;
+}
+.input-ventas-loggro {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    text-align: right;
+    font-size: 16px;
+    font-weight: bold;
+}
+.fila-total-loggro {
+    background-color: #f8f8f8;
+    font-size: 16px;
+}
+
+/* Toggle Switch Style */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 70px;
+  height: 38px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 30px; width: 30px;
+  left: 4px; bottom: 4px;
+  background-color: white;
+  transition: .4s;
+}
+input:checked + .slider { background-color: #b40000; }
+input:checked + .slider:before { transform: translateX(32px); }
+.slider.round { border-radius: 38px; }
+.slider.round:before { border-radius: 50%; }
+
+/* ESTADISTICAS DASHBOARD */
+.stats-grid-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dash-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    border: 1px solid #eee;
+}
+.dash-card-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.dash-gauge {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.gauge-text {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+.dash-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #b40000;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+}
+.dash-circle.dash-dark {
+    background: #333;
+}
+.dash-info {
+    display: flex;
+    flex-direction: column;
+}
+.dash-label {
+    font-size: 13px;
+    color: #888;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.dash-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: #b40000;
+    margin: 2px 0;
+}
+.dash-sub {
+    font-size: 12px;
+    color: #aaa;
+}
+.charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.chart-container-dash {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+.chart-container-dash h3 {
+    margin: 0 0 20px 0;
+    font-size: 14px;
+    color: #666;
+    letter-spacing: 1px;
+}
+
+@media (max-width: 900px) {
+    .charts-row { grid-template-columns: 1fr; }
+}
+
+/* NOTIFICACION BIENVENIDA */
+.welcome-toast {
+    position: fixed;
+    top: -150px; /* Empieza fuera de la pantalla */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ffffff;
+    color: #333;
+    padding: 20px 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    z-index: 9999;
+    font-weight: 800;
+    font-size: 20px;
+    border-left: 8px solid #b40000;
+    transition: top 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    min-width: 300px;
+    text-align: center;
+}
+.welcome-toast.show {
+    top: 30px; /* Baja a su posición visible */
+}
+.welcome-toast span {
+    color: #b40000;
+    margin-left: 5px;
+    text-transform: capitalize;
+}
+
+/* PESTAÑA LATERAL DERECHA */
+.side-tab {
+    position: fixed;
+    right: 0;
+    top: 150px;
+    background-color: #b40000;
+    width: 50px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 15px 0 0 15px;
+    cursor: pointer;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+    z-index: 100;
+    transition: width 0.2s;
+}
+.side-tab:hover {
+    width: 55px;
+    background-color: #900000;
+}
+.side-tab svg {
+    transition: transform 0.2s;
+}
+.side-tab:hover svg {
+    transform: scale(1.1);
+}

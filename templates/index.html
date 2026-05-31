@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Parqueadero - Panel Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="logo">PARQUEADERO PIKOTEO</div>
+        <div class="user-info">
+            <span id="labelEstadoCaja" class="badge-caja" onclick="gestionarCaja()" style="cursor:pointer;">Cargando...</span>
+            <span id="txtUserNameTop" style="font-weight: bold; margin: 0 10px;">{{ name }}</span>
+            <input type="hidden" id="hiddenUserRole" value="{{ role }}">
+            <input type="hidden" id="hiddenUserEmail" value="{{ user }}">
+            <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+        </div>
+    </div>
+
+    <!-- Notificación de Bienvenida -->
+    <div id="welcomeToast" class="welcome-toast">
+        Bienvenido, <span id="toastUserName">{{ name }}</span>
+    </div>
+
+    <div class="app-container">
+        <div class="sidebar">
+            <button class="menu-item active" onclick="mostrarSeccion('parqueadero')">Ver Parqueadero</button>
+            {% if role == 'ADMIN' %}
+            <button class="menu-item" onclick="mostrarSeccion('cuadres')">Cuadres de Caja</button>
+            <button class="menu-item" onclick="mostrarSeccion('reportes')">Reportes</button>
+            <button class="menu-item" onclick="mostrarSeccion('estadisticas')">Estadísticas</button>
+            <button class="menu-item" onclick="mostrarSeccion('auditoria')">Auditoría</button>
+            <button class="menu-item" onclick="mostrarSeccion('tarifas')">Tarifas</button>
+            <button class="menu-item" onclick="mostrarSeccion('usuarios')">Usuarios</button>
+            <button class="menu-item" onclick="mostrarSeccion('mensualidades')">Mensualidades</button>
+            {% endif %}
+        </div>
+
+        <div class="main-content">
+            <!-- SECCIÓN PARQUEADERO -->
+            <div id="seccion-parqueadero" class="seccion">
+                <div class="header-actions">
+                    <div class="input-group">
+                        <label>PLACA</label>
+                        <input type="text" id="txtPlaca" name="txtPlaca" class="input-big" placeholder="ABC123" maxlength="7" autocomplete="new-password">
+                    </div>
+                    <div class="input-group">
+                        <label>TIPO</label>
+                        <select id="tipoVehiculo" class="select-big">
+                            <option value="CARRO">CARRO</option>
+                            <option value="MOTO">MOTO</option>
+                        </select>
+                    </div>
+                    <button id="btnIngresar" class="btn-action btn-red">INGRESAR</button>
+                    <button id="btnSalida" class="btn-action btn-dark">SALIDA / COBRAR</button>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#ID</th>
+                                <th>Placa</th>
+                                <th>Tipo</th>
+                                <th>Ingreso</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaCuerpo">
+                            {% for t in activos %}
+                            <tr>
+                                <td>{{ "%05d" | format(t.id) }}</td>
+                                <td>{{ t.placa }}</td>
+                                <td>{{ t.tipo }}</td>
+                                <td>{{ t.ingreso }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECCIÓN CUADRES DE CAJA -->
+            <div id="seccion-cuadres" class="seccion" style="display:none;">
+                <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 30px;">CUADRES DE CAJA</h2>
+                <div class="loggro-filters">
+                    <div class="filter-row">
+                        <input type="date" id="filtroDesde">
+                        <input type="date" id="filtroHasta">
+                        <label style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="chkIncluirEliminados" onchange="cargarReportes()"> Ver papelera
+                        </label>
+                        <button onclick="cargarReportes()" class="btn-loggro-red">Buscar</button>
+                    </div>
+                </div>
+                <div style="text-align: right; margin-bottom: 10px;">
+                    <button onclick="gestionarCaja()" class="btn-loggro-red" style="border-radius: 20px; padding: 10px 30px;">Nueva</button>
+                </div>
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Fecha Inicio</th>
+                                <th>Fecha Fin</th>
+                                <th>Responsable</th>
+                                <th>Total Inicial</th>
+                                <th>Cerrada</th>
+                                <th colspan="2" style="text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaReportesCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="seccion-reportes" class="seccion" style="display:none;">
+                <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 20px;">REPORTES Y EXPORTACIÓN</h2>
+                <div class="header-actions" style="flex-direction: column; background: white; padding: 25px;">
+                    <div class="filter-row" style="width: 100%; flex-wrap: wrap; justify-content: center; gap: 15px;">
+                        <div class="input-group">
+                            <label>Desde</label>
+                            <input type="datetime-local" id="repDesde" class="input-loggro">
+                        </div>
+                        <div class="input-group">
+                            <label>Hasta</label>
+                            <input type="datetime-local" id="repHasta" class="input-loggro">
+                        </div>
+                        <button onclick="consultarReporte()" class="btn-loggro-red" style="align-self: flex-end; height: 45px;">CONSULTAR</button>
+                    </div>
+                </div>
+
+                <div class="table-container-loggro" style="margin-top: 25px;">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Placa</th>
+                                <th>Tipo</th>
+                                <th>Ingreso</th>
+                                <th>Salida</th>
+                                <th>Medio</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaReportePreviewCuerpo"></tbody>
+                    </table>
+                    <div id="msgNoReporte" style="text-align:center; padding:40px; color:#aaa;">
+                        Use los filtros superiores y haga clic en <b>Consultar</b> para previsualizar los datos.
+                    </div>
+                </div>
+
+                <div id="btnDescargarContainer" style="margin-top: 20px; text-align: center; display: none;">
+                    <button onclick="descargarReporteExcel('completo')" class="btn-action btn-red" style="width: 300px; height: 50px;">DESCARGAR REPORTE EXCEL</button>
+                </div>
+            </div>
+
+            <!-- SECCIÓN ESTADÍSTICAS -->
+            <div id="seccion-estadisticas" class="seccion" style="display:none;">
+                <h2 style="text-align: center;">ESTADÍSTICAS Y GRÁFICOS</h2>
+
+                <div class="loggro-filters">
+                    <div class="filter-row">
+                        <input type="date" id="estDesde">
+                        <input type="date" id="estHasta">
+                        <select id="estCajaId" class="select-loggro" style="min-width: 200px;">
+                            <option value="">-- Todas las cajas --</option>
+                        </select>
+                        <button onclick="cargarEstadisticas()" class="btn-loggro-red">Actualizar</button>
+                        <button onclick="abrirModalMetas()" class="btn-action btn-dark" style="height:35px; padding:0 15px;">Establecer Metas</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid-dashboard">
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-gauge">
+                                <canvas id="gaugeMetaDiaria" width="80" height="80"></canvas>
+                                <span id="txtPctMetaDiaria" class="gauge-text">0%</span>
+                            </div>
+                            <div class="dash-info">
+                                <span class="dash-label">Meta Diaria (Hoy)</span>
+                                <span id="statHoyTotal" class="dash-value">$0</span>
+                                <span class="dash-sub">Objetivo: <span id="statHoyMeta">$0</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-gauge">
+                                <canvas id="gaugeMetaSemanal" width="80" height="80"></canvas>
+                                <span id="txtPctMetaSemanal" class="gauge-text">0%</span>
+                            </div>
+                            <div class="dash-info">
+                                <span class="dash-label">Meta Semanal</span>
+                                <span id="statSemanaTotal" class="dash-value">$0</span>
+                                <span class="dash-sub">Objetivo: <span id="statSemanaMeta">$0</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-gauge">
+                                <canvas id="gaugeMetaMensual" width="80" height="80"></canvas>
+                                <span id="txtPctMetaMensual" class="gauge-text">0%</span>
+                            </div>
+                            <div class="dash-info">
+                                <span class="dash-label">Meta Mensual</span>
+                                <span id="statMesTotal" class="dash-value">$0</span>
+                                <span class="dash-sub">Objetivo: <span id="statMesMeta">$0</span></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-gauge">
+                                <canvas id="gaugeMetaAnual" width="80" height="80"></canvas>
+                                <span id="txtPctMetaAnual" class="gauge-text">0%</span>
+                            </div>
+                            <div class="dash-info">
+                                <span class="dash-label">Meta Anual</span>
+                                <span id="statAnioTotal" class="dash-value">$0</span>
+                                <span class="dash-sub">Objetivo: <span id="statAnioMeta">$0</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-grid-dashboard" style="margin-top:20px;">
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-circle"><span id="statCantCarrosDash">0</span></div>
+                            <div class="dash-info">
+                                <span class="dash-label">Carros en Periodo</span>
+                                <span id="statDineroCarrosDash" class="dash-value">$0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dash-card">
+                        <div class="dash-card-content">
+                            <div class="dash-circle dash-dark"><span id="statCantMotosDash">0</span></div>
+                            <div class="dash-info">
+                                <span class="dash-label">Motos en Periodo</span>
+                                <span id="statDineroMotosDash" class="dash-value">$0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="chart-container-dash">
+                        <h3>VEHÍCULOS POR HORA</h3>
+                        <canvas id="chartVentasHoras"></canvas>
+                    </div>
+                    <div class="chart-container-dash">
+                        <h3>FACTURADO ÚLTIMOS 7 DÍAS</h3>
+                        <canvas id="chartSieteDias"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-container-loggro" style="margin-top: 30px;">
+                    <h3 style="padding: 15px; margin: 0; border-bottom: 1px solid #eee;">Consolidado por Horas</h3>
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Ventas Carros ($)</th>
+                                <th>Ventas Motos ($)</th>
+                                <th>Cant. Carros</th>
+                                <th>Cant. Motos</th>
+                                <th>Total ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaEstHorasCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECCIÓN AUDITORIA -->
+            <div id="seccion-auditoria" class="seccion" style="display:none;">
+                <h2 style="text-align: center;">AUDITORÍA</h2>
+                <div class="loggro-filters">
+                    <div class="filter-row">
+                        <input type="date" id="audDesde">
+                        <input type="date" id="audHasta">
+                        <select id="audAccion" class="select-loggro" style="width: 250px;">
+                            <option value="TODAS">-- Todas las acciones --</option>
+                            <option value="APERTURA_CAJA">Apertura de Caja</option>
+                            <option value="SALIDA">Salida de Vehículo</option>
+                            <option value="CAMBIO_RESPONSABLE">Cambio de Responsable</option>
+                            <option value="ELIMINAR_CAJA">Eliminar Caja</option>
+                            <option value="RECUPERAR_CAJA">Recuperar Caja</option>
+                            <option value="REGISTRO_MENSUALIDAD">Nueva Mensualidad</option>
+                            <option value="ELIMINAR_MENSUALIDAD">Eliminar Mensualidad</option>
+                            <option value="CIERRE_CAJA">Cierre de Caja</option>
+                        </select>
+                        <button onclick="cargarAuditoria()" class="btn-loggro-red">Filtrar</button>
+                    </div>
+                </div>
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead><tr><th>Fecha</th><th>Admin</th><th>Acción</th><th>Detalle</th></tr></thead>
+                        <tbody id="tablaAuditoriaCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECCIÓN DOCUMENTOS / FACTURAS -->
+            <div id="seccion-facturas" class="seccion" style="display:none;">
+                <h2 style="text-align: center;">DOCUMENTOS</h2>
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead><tr><th>Fecha</th><th>No.</th><th>Tipo</th><th>Placa</th><th>Estado</th><th>Medio</th><th>Total</th><th>Acción</th></tr></thead>
+                        <tbody id="tablaFacturasCuerpo"></tbody>
+                    </table>
+                </div>
+                <!-- BOTÓN PARA VOLVER A CUADRES (SOLO ADMIN) -->
+                <div id="btnVolverCuadresContainer" style="margin-top: 20px; display: none;">
+                    <button class="btn-action btn-dark" onclick="mostrarSeccion('cuadres')">Volver a Cuadres</button>
+                </div>
+            </div>
+
+            <!-- CONFIGURACIONES -->
+            <div id="seccion-tarifas" class="seccion" style="display:none;">
+                <h2>Configuraciones Generales</h2>
+                <div class="header-actions" style="flex-wrap: wrap;">
+                    <div class="input-group">
+                        <label>Tarifa Carro</label>
+                        <input type="number" id="cfgTarifaCarro" class="input-loggro">
+                    </div>
+                    <div class="input-group">
+                        <label>Tarifa Moto</label>
+                        <input type="number" id="cfgTarifaMoto" class="input-loggro">
+                    </div>
+                    <button onclick="guardarTarifas()" class="btn-loggro-red">Guardar Configuraciones</button>
+                </div>
+            </div>
+            <div id="seccion-usuarios" class="seccion" style="display:none;">
+                <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 30px;">GESTIÓN DE USUARIOS</h2>
+
+                <div class="header-actions" style="flex-direction: column; background: white; padding: 25px; margin-bottom: 30px;">
+                    <h3 style="margin-top: 0; color: #555; font-size: 16px;">Registrar Nuevo Usuario</h3>
+                    <div class="filter-row" style="width: 100%; flex-wrap: wrap; gap: 15px;">
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Nombre Real</label>
+                            <input type="text" id="usrRealName" class="input-loggro" placeholder="Ej: Esteban">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 200px;">
+                            <label>Correo Electrónico</label>
+                            <input type="email" id="usrNombre" class="input-loggro" placeholder="ejemplo@correo.com">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Contraseña</label>
+                            <input type="password" id="usrClave" class="input-loggro" placeholder="******" autocomplete="new-password">
+                        </div>
+                        <div class="input-group" style="min-width: 150px;">
+                            <label>Rol</label>
+                            <select id="usrRol" class="select-loggro">
+                                <option value="OPERARIO">OPERARIO</option>
+                                <option value="ADMIN">ADMINISTRADOR</option>
+                            </select>
+                        </div>
+                        <button onclick="guardarUsuario()" class="btn-loggro-red" style="align-self: flex-end; height: 45px;">CREAR USUARIO</button>
+                    </div>
+                    <p style="font-size: 11px; color: #888; margin-top: 10px;">* El usuario debe ser un correo válido. La contraseña debe tener al menos 6 caracteres.</p>
+                </div>
+
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Usuario (Correo)</th>
+                                <th>Rol</th>
+                                <th style="text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaUsuariosCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="seccion-mensualidades" class="seccion" style="display:none;">
+                <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 30px;">GESTIÓN DE MENSUALIDADES</h2>
+
+                <div class="header-actions" style="flex-direction: column; background: white; padding: 25px; margin-bottom: 30px;">
+                    <h3 style="margin-top: 0; color: #555; font-size: 16px;">Nueva Suscripción</h3>
+                    <div class="filter-row" style="width: 100%; flex-wrap: wrap; gap: 15px;">
+                        <div class="input-group" style="flex: 1; min-width: 120px;">
+                            <label>Placa</label>
+                            <input type="text" id="mPlaca" class="input-loggro" placeholder="ABC123">
+                        </div>
+                        <div class="input-group" style="flex: 2; min-width: 200px;">
+                            <label>Nombre del Cliente</label>
+                            <input type="text" id="mCliente" class="input-loggro" placeholder="Nombre completo">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Fecha Inicio</label>
+                            <input type="date" id="mInicio" class="input-loggro">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Fecha Fin</label>
+                            <input type="date" id="mFin" class="input-loggro">
+                        </div>
+                        <div class="input-group" style="flex: 1; min-width: 150px;">
+                            <label>Valor Pagado ($)</label>
+                            <input type="number" id="mValor" class="input-loggro" placeholder="0">
+                        </div>
+                        <button onclick="guardarMensualidad()" class="btn-loggro-red" style="align-self: flex-end; height: 45px;">REGISTRAR</button>
+                    </div>
+                </div>
+
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>Placa</th>
+                                <th>Cliente</th>
+                                <th>Inicio</th>
+                                <th>Vencimiento</th>
+                                <th>Valor</th>
+                                <th>Estado</th>
+                                <th style="text-align: center;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaMensualidadesCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL APERTURA -->
+    <div id="modalApertura" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <h2 style="text-align:center;">Apertura de Caja</h2>
+            <div class="modal-body">
+                <label>Responsable</label>
+                <select id="aperturaUsuario" class="select-loggro"></select>
+                <label style="margin-top:15px; display:block;">Base Inicial</label>
+                <input type="number" id="aperturaBase" class="input-loggro" value="0">
+            </div>
+            <div class="modal-footer" style="justify-content:center; gap:10px; border:none;">
+                <button class="btn-loggro-red" onclick="abrirTurno()">ABRIR TURNO</button>
+                <button class="btn-action btn-dark" onclick="cerrarModal()">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CUADRE -->
+    <div id="modalCuadre" class="modal">
+        <div class="modal-content" style="width: 550px;">
+            <span class="close-modal" onclick="cerrarModal()">&times;</span>
+            <div class="modal-header"><h2>Cuadre de caja</h2><p id="cuadreFechas"></p></div>
+            <div class="modal-body">
+                <div class="info-item" style="margin-bottom: 20px;">
+                    <label style="color: #888; font-size: 14px; font-weight: normal; margin: 0;">Responsable de caja</label>
+                    <span id="txtResponsableCierre" style="font-size: 18px; font-weight: bold; display: block; margin-top: 5px;">--</span>
+                </div>
+                <table class="tabla-loggro-ventas" style="margin-top:20px; width:100%;">
+                    <tr><td>Efectivo</td><td><input type="number" id="inEfDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td></tr>
+                    <tr><td>QR</td><td><input type="number" id="inQrDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td></tr>
+                    <tr class="fila-total-loggro"><td>Total</td><td id="txtTotalLoggro" style="text-align:right;">$ 0</td></tr>
+                </table>
+                <div id="panelSwitchCierre" style="text-align:center; margin-top:20px;">
+                    <p>Cerrar caja definitivamente</p>
+                    <label class="switch"><input type="checkbox" id="chkCerrarCajaLoggro"><span class="slider round"></span></label>
+                </div>
+            </div>
+            <div class="modal-footer" style="border:none;">
+                <button id="btnImprimirLoggro" class="btn-action btn-dark" onclick="imprimirCuadre()" style="display:none;">IMPRIMIR</button>
+                <button id="btnGuardarCierreFinal" class="btn-loggro-red" onclick="guardarCambiosCuadre()">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pestaña lateral derecha -->
+    <div class="side-tab" onclick="abrirModalUltimaHora()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+    </div>
+
+    <!-- MODAL TICKETS ÚLTIMA HORA -->
+    <div id="modalUltimaHora" class="modal">
+        <div class="modal-content" style="width: 700px;">
+            <span class="close-modal" onclick="cerrarModal()" style="z-index: 10;">&times;</span>
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; padding: 20px 40px 15px 25px;">
+                <h2 style="margin:0; font-size:18px; color: #333; letter-spacing: 0.5px;">Tickets de la última hora</h2>
+                <button onclick="cargarTicketsUltimaHora()" class="btn-loggro-red" style="padding: 8px 20px; font-size: 13px; margin-right: 15px; border-radius: 20px;">🔄 Refrescar</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Placa</th>
+                                <th>Tipo</th>
+                                <th>Salida</th>
+                                <th>Total</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaUltimaHoraCuerpo"></tbody>
+                    </table>
+                    <div id="msgNoTickets" style="text-align:center; padding:30px; color:#888; display:none;">
+                        No se han encontrado tickets generados en la última hora.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL METAS -->
+    <div id="modalMetas" class="modal">
+        <div class="modal-content" style="width: 450px;">
+            <span class="close-modal" onclick="cerrarModal()">&times;</span>
+            <div class="modal-header"><h2>Establecer Metas de Recaudo</h2></div>
+            <div class="modal-body">
+                <div class="input-group" style="margin-bottom:15px;">
+                    <label>Meta Diaria ($)</label>
+                    <input type="number" id="mDiaria" class="input-loggro">
+                </div>
+                <div class="input-group" style="margin-bottom:15px;">
+                    <label>Meta Semanal ($)</label>
+                    <input type="number" id="mSemanal" class="input-loggro">
+                </div>
+                <div class="input-group" style="margin-bottom:15px;">
+                    <label>Meta Mensual ($)</label>
+                    <input type="number" id="mMensual" class="input-loggro">
+                </div>
+                <div class="input-group" style="margin-bottom:15px;">
+                    <label>Meta Anual ($)</label>
+                    <input type="number" id="mAnual" class="input-loggro">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-loggro-red" onclick="guardarMetas()">GUARDAR METAS</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

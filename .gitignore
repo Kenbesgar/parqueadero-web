@@ -1,0 +1,14 @@
+# Ignorar base de datos local al subir a producción
+parqueadero.db
+
+# Ignorar archivos de configuración de caja y tarifas
+config.ini
+caja.ini
+
+# Python basura
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.idea/

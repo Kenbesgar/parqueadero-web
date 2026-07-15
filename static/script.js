@@ -169,16 +169,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if(btnG) btnG.style.display = (esSoloLectura || data.fecha_cierre) ? 'none' : ((isAdmin || isOwner) ? 'block' : 'none');
         if(btnImp) btnImp.style.display = 'block';
 
+        // Mostrar valores del sistema
+        const sis = data.valores_actuales || { efectivo: 0, qr: 0, total: 0 };
+        document.getElementById('valSisEf').textContent = `$ ${sis.efectivo.toLocaleString()}`;
+        document.getElementById('valSisQr').textContent = `$ ${sis.qr.toLocaleString()}`;
+        document.getElementById('valSisTotal').textContent = `$ ${sis.total.toLocaleString()}`;
+
         if (data.fecha_cierre) {
             inEf.value = data.vts_ef_dig;
             inQr.value = data.vts_qr_dig;
             const t = (parseFloat(data.vts_ef_dig) || 0) + (parseFloat(data.vts_qr_dig) || 0);
             document.getElementById('txtTotalLoggro').textContent = `$ ${t.toLocaleString()}`;
+
+            // Mostrar diferencia en cajas cerradas
+            const diff = t - sis.total;
+            document.getElementById('filaDiferencia').style.display = 'table-row';
+            document.getElementById('valDiferencia').textContent = `$ ${diff.toLocaleString()}`;
+            document.getElementById('valDiferencia').style.color = diff < 0 ? '#dc3545' : (diff > 0 ? '#28a745' : '#333');
         } else {
-            // Para cajas abiertas, dejamos que el usuario digite desde cero para evitar confusiones
             inEf.value = '';
             inQr.value = '';
             document.getElementById('txtTotalLoggro').textContent = '$ 0';
+            document.getElementById('filaDiferencia').style.display = 'none';
         }
 
         document.getElementById('modalCuadre').style.display = 'block';
@@ -337,12 +349,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await (await fetch(`/api/reportes?incluir_eliminados=${inc}`)).json();
         const est = await (await fetch('/api/caja/estado')).json();
         let lista = [...res];
-        if (est.estado === 'ABIERTA') {
-            const yaEsta = lista.find(x => x.fecha_apertura === est.fecha_apertura && x.usuario === est.usuario);
-            if(!yaEsta) lista.unshift({ id: 'ACTIVA', fecha_apertura: est.fecha_apertura, fecha_cierre: '', usuario: est.usuario, base: est.base });
+        if (est.id && est.estado === 'ABIERTA') {
+            const yaEsta = lista.find(x => x.id == est.id);
+            if(!yaEsta) lista.unshift({ id: est.id, fecha_apertura: est.fecha_apertura, fecha_cierre: '', usuario: est.usuario, base: est.base });
         }
-        tbody.innerHTML = lista.map(r => `
-            <tr class="${!r.fecha_cierre ? 'fila-abierta' : ''} ${r.estado === 'ELIMINADO' ? 'fila-eliminada' : ''}">
+        tbody.innerHTML = lista.map(r => {
+            const isActiva = !r.fecha_cierre || r.fecha_cierre === '';
+            const actionBtn = isActiva
+                ? `<button class="btn-loggro-red" onclick="abrirPorId('${r.usuario}')">Cerrar</button>`
+                : `<button class="btn-ver-loggro" onclick="verResumenCierre(${r.id})">Ver</button>`;
+
+            return `<tr class="${isActiva ? 'fila-abierta' : ''} ${r.estado === 'ELIMINADO' ? 'fila-eliminada' : ''}">
                 <td>${r.id}</td>
                 <td>${r.fecha_apertura}</td>
                 <td>${r.fecha_cierre || 'EN CURSO'}</td>
@@ -350,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>$${Number(r.base).toLocaleString()}</td>
                 <td>${r.fecha_cierre ? 'Si' : 'No'}</td>
                 <td style="display:flex; gap:5px;">
-                    <button class="btn-loggro-red" onclick="${!r.fecha_cierre ? `abrirPorId('${r.usuario}')` : `verResumenCierre('${r.id}')`}">${!r.fecha_cierre ? 'Cerrar' : 'Ver'}</button>
+                    ${actionBtn}
                     <button class="btn-ver-facturas" onclick="verFacturasCaja('${r.fecha_apertura}', '${r.fecha_cierre || 'EN CURSO'}', '${r.usuario}')">Fac.</button>
                     ${userRole === 'ADMIN' && r.id !== 'ACTIVA' ?
                         (r.estado === 'ELIMINADO' ?
@@ -359,7 +376,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ) : ''
                     }
                 </td>
-            </tr>`).join('');
+            </tr>`;
+        }).join('');
     };
 
     window.eliminarCaja = async (id) => {

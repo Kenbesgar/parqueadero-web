@@ -367,16 +367,23 @@ class ParkingManager:
         row = cursor.fetchone(); conn.close()
         if not row: return None
         res = dict(row)
-        # Para que sea compatible con el modal, mapeamos los valores guardados
-        res['valores_actuales'] = {
-            'efectivo': row['vts_ef_sis'],
-            'qr': row['vts_qr_sis'],
-            'total': row['vts_ef_sis'] + row['vts_qr_sis']
-        }
+
+        # Para que sea compatible con el modal, mapeamos los valores
+        if row['fecha_cierre'] and row['fecha_cierre'] != '':
+            res['valores_actuales'] = {
+                'efectivo': float(row['vts_ef_sis'] or 0),
+                'qr': float(row['vts_qr_sis'] or 0),
+                'total': float((row['vts_ef_sis'] or 0) + (row['vts_qr_sis'] or 0))
+            }
+        else:
+            # Si está abierta, calculamos los valores actuales
+            v_act = self.get_valores_actuales(row['usuario'])
+            res['valores_actuales'] = v_act
+
         res['digitado'] = {
-            'efectivo': row['vts_ef_dig'],
-            'qr': row['vts_qr_dig'],
-            'total': row['vts_ef_dig'] + row['vts_qr_dig']
+            'efectivo': float(row['vts_ef_dig'] or 0),
+            'qr': float(row['vts_qr_dig'] or 0),
+            'total': float((row['vts_ef_dig'] or 0) + (row['vts_qr_dig'] or 0))
         }
         return res
 

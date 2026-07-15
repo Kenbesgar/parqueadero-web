@@ -460,9 +460,32 @@
                     <span id="txtResponsableCierre" style="font-size: 18px; font-weight: bold; display: block; margin-top: 5px;">--</span>
                 </div>
                 <table class="tabla-loggro-ventas" style="margin-top:20px; width:100%;">
-                    <tr><td>Efectivo</td><td><input type="number" id="inEfDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td></tr>
-                    <tr><td>QR</td><td><input type="number" id="inQrDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td></tr>
-                    <tr class="fila-total-loggro"><td>Total</td><td id="txtTotalLoggro" style="text-align:right;">$ 0</td></tr>
+                    <thead>
+                        <tr style="font-size: 11px; color: #888; border-bottom: 1px solid #eee;">
+                            <th>CATEGORÍA</th>
+                            <th style="text-align:right;">SISTEMA</th>
+                            <th style="text-align:right;">ENTREGADO</th>
+                        </tr>
+                    </thead>
+                    <tr>
+                        <td>Efectivo</td>
+                        <td id="valSisEf" style="text-align:right; color:#888;">$ 0</td>
+                        <td><input type="number" id="inEfDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td>
+                    </tr>
+                    <tr>
+                        <td>QR</td>
+                        <td id="valSisQr" style="text-align:right; color:#888;">$ 0</td>
+                        <td><input type="number" id="inQrDig" class="input-ventas-loggro" oninput="recalcularTotalLoggro()"></td>
+                    </tr>
+                    <tr class="fila-total-loggro">
+                        <td>TOTALES</td>
+                        <td id="valSisTotal" style="text-align:right;">$ 0</td>
+                        <td id="txtTotalLoggro" style="text-align:right;">$ 0</td>
+                    </tr>
+                    <tr id="filaDiferencia" style="display:none; background: #fffde6;">
+                        <td style="font-weight:bold;">DIFERENCIA</td>
+                        <td colspan="2" id="valDiferencia" style="text-align:right; font-weight:bold; font-size:18px;">$ 0</td>
+                    </tr>
                 </table>
                 <div id="panelSwitchCierre" style="text-align:center; margin-top:20px;">
                     <p>Cerrar caja definitivamente</p>

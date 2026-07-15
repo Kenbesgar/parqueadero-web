@@ -102,18 +102,22 @@ class ParkingManager:
         caja = self.get_estado_caja(usuario)
         if caja['estado'] == 'CERRADA': return {'efectivo': 0, 'qr': 0, 'total': 0, 'cnt_ef': 0, 'cnt_qr': 0, 'descuentos': 0}
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        # Filtramos estrictamente por el ID de la caja actual para evitar solapamientos por hora
-        cursor.execute("SELECT valor, medio_pago, descuento FROM tickets WHERE estado = 'PAGADO' AND id_cierre = ?", (caja['id'],))
+        # Filtramos por usuario y estado PAGADO
+        cursor.execute("SELECT valor, medio_pago, descuento, salida FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ? COLLATE NOCASE", (usuario,))
         ef, qr, cef, cqr, dtot = 0.0, 0.0, 0, 0, 0.0
+        f_apertura = self.parse_fecha(caja['fecha_apertura'])
 
         for row in cursor.fetchall():
-            dtot += float(row[2])
-            if row[1] == 'QR':
-                qr += float(row[0])
-                cqr += 1
-            else:
-                ef += float(row[0])
-                cef += 1
+            f_salida = self.parse_fecha(row[3])
+            # Solo sumamos si la salida fue después de abrir esta caja específica
+            if f_salida >= f_apertura:
+                dtot += float(row[2])
+                if row[1] == 'QR':
+                    qr += float(row[0])
+                    cqr += 1
+                else:
+                    ef += float(row[0])
+                    cef += 1
         conn.close(); return {'efectivo': ef, 'qr': qr, 'cnt_ef': cef, 'cnt_qr': cqr, 'total': ef + qr, 'descuentos': dtot}
 
     def cerrar_caja(self, ef_dig, qr_dig, usuario_caja):

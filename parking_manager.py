@@ -1,8 +1,11 @@
 import sqlite3
 import datetime
+import pytz
 import configparser
 import os
 import re
+
+TZ_COLOMBIA = pytz.timezone('America/Bogota')
 
 class ParkingManager:
     def __init__(self, db_path="parqueadero.db"):
@@ -19,9 +22,10 @@ class ParkingManager:
         self.cargar_sesion()
 
     def ahora(self):
-        # Ajuste para Colombia (UTC-5)
-        # Esto asegura que en PythonAnywhere la hora sea la correcta
-        return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
+        # Ajuste exacto para Colombia usando pytz.
+        # Convierte la hora local a un objeto sin información de zona horaria (naive)
+        # para que se compare y guarde sin problemas en SQLite.
+        return datetime.datetime.now(TZ_COLOMBIA).replace(tzinfo=None)
 
     def inicializar_base_de_datos(self):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
@@ -44,7 +48,7 @@ class ParkingManager:
 
     def solicitar_registro(self, n, c, p, r):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        ahora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        ahora = self.ahora().strftime("%d/%m/%Y %H:%M:%S")
         try:
             cursor.execute("INSERT INTO solicitudes_registro (nombre, correo, password, role, fecha) VALUES (?, ?, ?, ?, ?)", (n, c.lower().strip(), p, r, ahora))
             conn.commit(); conn.close(); return True
@@ -92,7 +96,7 @@ class ParkingManager:
     def abrir_caja(self, usuario, base):
         if self.get_estado_caja(usuario)['estado'] == 'ABIERTA': return False
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        ahora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        ahora = self.ahora().strftime("%d/%m/%Y %H:%M:%S")
         cursor.execute("INSERT INTO cierres (usuario, fecha_apertura, base, estado) VALUES (?, ?, ?, 'ACTIVO')", (usuario, ahora, base))
         self.registrar_auditoria(cursor, usuario, "APERTURA_CAJA", f"Base: {base}")
         conn.commit(); conn.close(); return True
@@ -119,7 +123,7 @@ class ParkingManager:
         if caja['estado'] == 'CERRADA': return False
         sis = self.get_valores_actuales(usuario_caja)
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        ahora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        ahora = self.ahora().strftime("%d/%m/%Y %H:%M:%S")
         cursor.execute("UPDATE cierres SET fecha_cierre = ?, vts_ef_sis = ?, vts_qr_sis = ?, vts_ef_dig = ?, vts_qr_dig = ?, cnt_ef_sis = ?, cnt_qr_sis = ? WHERE rowid = ?",
                        (ahora, sis['efectivo'], sis['qr'], ef_dig, qr_dig, sis['cnt_ef'], sis['cnt_qr'], caja['id']))
         self.registrar_auditoria(cursor, usuario_caja, "CIERRE_CAJA", f"Caja ID: {caja['id']}")
@@ -145,7 +149,7 @@ class ParkingManager:
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tickets WHERE placa = ? AND estado = 'ACTIVO'", (placa,))
         if cursor.fetchone()[0] > 0: conn.close(); return "ERROR: Ya está adentro."
-        ahora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        ahora = self.ahora().strftime("%d/%m/%Y %H:%M:%S")
         cursor.execute("INSERT INTO tickets (placa, tipo, ingreso, salida, valor, estado, usuario_ingreso) VALUES (?, ?, ?, 'N/A', 0, 'ACTIVO', ?)", (placa, tipo_final, ahora, usuario))
         t_id = cursor.lastrowid
         conn.commit(); conn.close();
@@ -159,7 +163,9 @@ class ParkingManager:
         row = cursor.fetchone()
         if not row: conn.close(); return {"status": "error", "msg": "No encontrado."}
 
-        t_in = self.parse_fecha(row['ingreso']); t_out = datetime.datetime.now(); mins = int((t_out - t_in).total_seconds() / 60)
+        t_in = self.parse_fecha(row['ingreso'])
+        t_out = self.ahora()
+        mins = int((t_out - t_in).total_seconds() / 60)
         tarifa = self.get_tarifa_carro() if row['tipo'] == "CARRO" else self.get_tarifa_moto()
 
         if mins <= 60: hrs = 1.0
@@ -181,7 +187,8 @@ class ParkingManager:
 
     def get_tickets_rango(self, inicio, fin, usuario=None):
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
-        t_i = self.parse_fecha(inicio); t_f = datetime.datetime.now() if fin == 'EN CURSO' else self.parse_fecha(fin)
+        t_i = self.parse_fecha(inicio)
+        t_f = self.ahora() if fin == 'EN CURSO' else self.parse_fecha(fin)
 
         if usuario:
             query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?)"
@@ -209,7 +216,7 @@ class ParkingManager:
         cursor.execute(sql); rows = [dict(r) for r in cursor.fetchall()]; conn.close(); return rows
 
     def registrar_auditoria(self, cursor, u, a, d):
-        cursor.execute("INSERT INTO auditoria (usuario, accion, detalle, fecha) VALUES (?, ?, ?, ?)", (u, a, d, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")))
+        cursor.execute("INSERT INTO auditoria (usuario, accion, detalle, fecha) VALUES (?, ?, ?, ?)", (u, a, d, self.ahora().strftime("%d/%m/%Y %H:%M:%S")))
 
     def get_auditoria(self, d=None, h=None, a=None):
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
@@ -243,7 +250,7 @@ class ParkingManager:
         all_t = [dict(r) for r in cursor.fetchall()]
 
         d_obj = self.parse_fecha(desde)
-        if hasta == 'EN CURSO': h_obj = datetime.datetime.now()
+        if hasta == 'EN CURSO': h_obj = self.ahora()
         else:
             h_obj = self.parse_fecha(hasta)
             if h_obj != datetime.datetime(1900,1,1) and len(str(hasta)) <= 10:
@@ -430,14 +437,14 @@ class ParkingManager:
             base_stats = [t for t in all_pagados if str(t['usuario_pago']).strip().lower() == str(usuario_filtro).strip().lower()]
 
         d_obj = self.parse_fecha(desde)
-        h_obj = datetime.datetime.now() if hasta == 'EN CURSO' else self.parse_fecha(hasta)
+        h_obj = self.ahora() if hasta == 'EN CURSO' else self.parse_fecha(hasta)
         if len(str(hasta)) <= 10 and h_obj != datetime.datetime(1900,1,1):
             h_obj = h_obj.replace(hour=23, minute=59, second=59)
 
         # 'filtrados' son los tickets que entran en el rango de fecha seleccionado para las tarjetas inferiores
         filtrados = [t for t in base_stats if d_obj <= self.parse_fecha(t['salida']) <= h_obj]
 
-        ahora = datetime.datetime.now()
+        ahora = self.ahora()
 
         # Cálculos de periodos para metas (usan base_stats para respetar el filtro)
         def get_total_periodo(inicio, fin):
@@ -469,7 +476,7 @@ class ParkingManager:
         for t in base_stats:
             ts = self.parse_fecha(t['salida'])
             if inicio_7 <= ts <= fin_7:
-                dk = ts.strftime("%Y-%m-%d");
+                dk = ts.strftime("%Y-%m-%d")
                 if dk in ultimos_7_dias: ultimos_7_dias[dk] += float(t['valor'])
 
         res = {
@@ -491,46 +498,6 @@ class ParkingManager:
         for h in range(24): res["por_hora"][h] = {"CARRO": 0, "MOTO": 0, "cnt_c": 0, "cnt_m": 0}
         for t in filtrados:
             tipo, valor = t['tipo'], float(t['valor'])
-            res["conteos"][tipo] += 1
-            res["dinero"][tipo] += valor
-            h_salida = self.parse_fecha(t['salida']).hour
-            res["por_hora"][h_salida][tipo] += valor
-            if tipo == "CARRO": res["por_hora"][h_salida]["cnt_c"] += 1
-            else: res["por_hora"][h_salida]["cnt_m"] += 1
-
-        suma_total = res["dinero"]["CARRO"] + res["dinero"]["MOTO"]
-        for h, data in res["por_hora"].items():
-            total_h = data["CARRO"] + data["MOTO"]
-            if total_h > 0:
-                if total_h > res["max_hora"]["valor"]: res["max_hora"] = {"hora": h, "valor": total_h}
-                if total_h < res["min_hora"]["valor"]: res["min_hora"] = {"hora": h, "valor": total_h}
-
-        if res["min_hora"]["valor"] == float('inf'): res["min_hora"]["valor"] = 0
-        res["promedios"]["ticket"] = suma_total / len(filtrados) if len(filtrados) > 0 else 0
-        diff_days = (h_obj - d_obj).days + 1
-        res["promedios"]["diario"] = suma_total / diff_days if diff_days > 0 else suma_total
-
-        conn.close(); return res
-
-        res = {
-            "conteos": {"CARRO": 0, "MOTO": 0},
-            "dinero": {"CARRO": 0.0, "MOTO": 0.0},
-            "por_hora": {},
-            "max_hora": {"hora": None, "valor": 0},
-            "min_hora": {"hora": None, "valor": float('inf')},
-            "promedios": {"diario": 0, "ticket": 0},
-            "historial_7_dias": ultimos_7_dias,
-            "dashboard_metas": {
-                "hoy": {"total": total_hoy, "meta": float(self.config.get('METAS', 'diaria', fallback=500000))},
-                "semana": {"total": total_semana, "meta": float(self.config.get('METAS', 'semanal', fallback=3000000))},
-                "mes": {"total": total_mes, "meta": float(self.config.get('METAS', 'mensual', fallback=12000000))},
-                "anio": {"total": total_anio, "meta": float(self.config.get('METAS', 'anual', fallback=140000000))}
-            }
-        }
-
-        for h in range(24): res["por_hora"][h] = {"CARRO": 0, "MOTO": 0, "cnt_c": 0, "cnt_m": 0}
-        for t in filtrados:
-            tipo, valor = t['tipo'], t['valor']
             res["conteos"][tipo] += 1
             res["dinero"][tipo] += valor
             h_salida = self.parse_fecha(t['salida']).hour

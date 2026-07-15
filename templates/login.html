@@ -9,10 +9,13 @@
         .login-card h2 { color: #b40000; margin-bottom: 25px; }
         .form-group { margin-bottom: 15px; text-align: left; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-        .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
         .btn-login { background-color: #b40000; color: white; border: none; width: 100%; padding: 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-login:hover { background-color: #900000; }
+        .btn-secondary { background-color: transparent; color: #666; border: none; font-size: 13px; cursor: pointer; margin-top: 15px; text-decoration: underline; }
         .error { color: red; margin-bottom: 15px; font-size: 14px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 350px; position: relative; }
     </style>
 </head>
 <body>
@@ -30,6 +33,59 @@
             </div>
             <button type="submit" class="btn-login">ENTRAR</button>
         </form>
+        <button class="btn-secondary" onclick="document.getElementById('modalRegistro').style.display='flex'">Solicitar Registro</button>
     </div>
+
+    <div id="modalRegistro" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#b40000; margin-top:0;">Solicitud de Acceso</h3>
+            <div class="form-group">
+                <label>Nombre Real</label>
+                <input type="text" id="regNombre" placeholder="Ej: Esteban">
+            </div>
+            <div class="form-group">
+                <label>Correo Electrónico</label>
+                <input type="email" id="regCorreo" placeholder="ejemplo@correo.com">
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="regClave" placeholder="******">
+            </div>
+            <div class="form-group">
+                <label>Rol Solicitado</label>
+                <select id="regRol">
+                    <option value="OPERARIO">OPERARIO</option>
+                    <option value="ADMIN">ADMINISTRADOR</option>
+                </select>
+            </div>
+            <button class="btn-login" onclick="enviarSolicitud()">ENVIAR SOLICITUD</button>
+            <button class="btn-secondary" onclick="document.getElementById('modalRegistro').style.display='none'">Cancelar</button>
+        </div>
+    </div>
+
+    <script>
+        async function enviarSolicitud() {
+            const n = document.getElementById('regNombre').value.trim();
+            const c = document.getElementById('regCorreo').value.trim();
+            const p = document.getElementById('regClave').value;
+            const r = document.getElementById('regRol').value;
+
+            if(!n || !c || !p) return alert("Complete todos los campos");
+
+            const res = await fetch('/api/solicitudes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name: n, username: c, password: p, role: r })
+            });
+
+            if(res.ok) {
+                alert("Solicitud enviada. Un administrador principal debe aprobarla.");
+                document.getElementById('modalRegistro').style.display='none';
+            } else {
+                const d = await res.json();
+                alert(d.msg || "Error al enviar solicitud");
+            }
+        }
+    </script>
 </body>
 </html>

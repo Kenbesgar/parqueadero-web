@@ -24,6 +24,7 @@ class ParkingManager:
         cursor.execute("CREATE TABLE IF NOT EXISTS cierres (usuario TEXT, fecha_apertura TEXT, fecha_cierre TEXT, base REAL, vts_ef_sis REAL DEFAULT 0, vts_qr_sis REAL DEFAULT 0, vts_ef_dig REAL DEFAULT 0, vts_qr_dig REAL DEFAULT 0, cnt_ef_sis INTEGER DEFAULT 0, cnt_qr_sis INTEGER DEFAULT 0, estado TEXT DEFAULT 'ACTIVO')")
         cursor.execute("CREATE TABLE IF NOT EXISTS auditoria (usuario TEXT, accion TEXT, detalle TEXT, fecha TEXT)")
         cursor.execute("CREATE TABLE IF NOT EXISTS mensualidades (placa TEXT PRIMARY KEY, cliente TEXT, fecha_inicio TEXT, fecha_fin TEXT, valor_pagado REAL)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS solicitudes_registro (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, correo TEXT UNIQUE, password TEXT, role TEXT, fecha TEXT)")
         try: cursor.execute("ALTER TABLE tickets ADD COLUMN usuario_ingreso TEXT")
         except: pass
         try: cursor.execute("ALTER TABLE tickets ADD COLUMN usuario_pago TEXT")
@@ -35,6 +36,46 @@ class ParkingManager:
         try: cursor.execute("ALTER TABLE cierres ADD COLUMN estado TEXT DEFAULT 'ACTIVO'")
         except: pass
         conn.commit(); conn.close()
+
+    def solicitar_registro(self, n, c, p, r):
+        conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
+        ahora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        try:
+            cursor.execute("INSERT INTO solicitudes_registro (nombre, correo, password, role, fecha) VALUES (?, ?, ?, ?, ?)", (n, c.lower().strip(), p, r, ahora))
+            conn.commit(); conn.close(); return True
+        except:
+            conn.close(); return False
+
+    def get_solicitudes_registro(self):
+        conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
+        cursor.execute("SELECT * FROM solicitudes_registro ORDER BY id DESC")
+        rows = [dict(r) for r in cursor.fetchall()]; conn.close(); return rows
+
+    def procesar_solicitud(self, id_sol, accion, admin_u):
+        conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
+        cursor.execute("SELECT * FROM solicitudes_registro WHERE id = ?", (id_sol,))
+        sol = cursor.fetchone()
+        if not sol: conn.close(); return False
+
+        if accion == 'APROBAR':
+            u, p, r, n = sol['correo'], sol['password'], sol['role'], sol['nombre']
+            self.config['USUARIOS'][u] = f"{p}|{r}|{n}"
+            self.save_config()
+            self.registrar_auditoria(cursor, admin_u, "APROBAR_REGISTRO", f"Usuario: {u}")
+
+        cursor.execute("DELETE FROM solicitudes_registro WHERE id = ?", (id_sol,))
+        conn.commit(); conn.close(); return True
+
+    def cambiar_rol_usuario(self, u, nuevo_rol, admin_u):
+        info = self.get_usuario_info(u)
+        if not info: return False
+        parts = info.split('|')
+        parts[1] = nuevo_rol
+        self.config['USUARIOS'][u.lower()] = "|".join(parts)
+        self.save_config()
+        conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
+        self.registrar_auditoria(cursor, admin_u, "CAMBIO_ROL", f"Usuario: {u} a {nuevo_rol}")
+        conn.commit(); conn.close(); return True
 
     def get_estado_caja(self, usuario):
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
@@ -55,12 +96,17 @@ class ParkingManager:
         caja = self.get_estado_caja(usuario)
         if caja['estado'] == 'CERRADA': return {'efectivo': 0, 'qr': 0, 'total': 0, 'cnt_ef': 0, 'cnt_qr': 0, 'descuentos': 0}
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        cursor.execute("SELECT valor, medio_pago, descuento FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ? AND salida >= ?", (usuario, caja['fecha_apertura']))
+        # Traemos todos los tickets pagados por el usuario y filtramos por fecha en Python para evitar errores de formato SQL
+        cursor.execute("SELECT valor, medio_pago, descuento, salida FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ?", (usuario,))
         ef, qr, cef, cqr, dtot = 0.0, 0.0, 0, 0, 0.0
+        f_apertura = self.parse_fecha(caja['fecha_apertura'])
+
         for row in cursor.fetchall():
-            dtot += row[2]
-            if row[1] == 'QR': qr += row[0]; cqr += 1
-            else: ef += row[0]; cef += 1
+            f_salida = self.parse_fecha(row[3])
+            if f_salida >= f_apertura:
+                dtot += row[2]
+                if row[1] == 'QR': qr += row[0]; cqr += 1
+                else: ef += row[0]; cef += 1
         conn.close(); return {'efectivo': ef, 'qr': qr, 'cnt_ef': cef, 'cnt_qr': cqr, 'total': ef + qr, 'descuentos': dtot}
 
     def cerrar_caja(self, ef_dig, qr_dig, usuario_caja):
@@ -131,8 +177,14 @@ class ParkingManager:
     def get_tickets_rango(self, inicio, fin, usuario=None):
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
         t_i = self.parse_fecha(inicio); t_f = datetime.datetime.now() if fin == 'EN CURSO' else self.parse_fecha(fin)
-        query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?)"
-        cursor.execute(query, (usuario, usuario))
+
+        if usuario:
+            query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?)"
+            cursor.execute(query, (usuario, usuario))
+        else:
+            query = "SELECT * FROM tickets"
+            cursor.execute(query)
+
         all_t = [dict(r) for r in cursor.fetchall()]
         res = [t for t in all_t if (t_i <= self.parse_fecha(t['ingreso']) <= t_f) or (t['salida'] != 'N/A' and t_i <= self.parse_fecha(t['salida']) <= t_f)]
         conn.close(); return res
@@ -252,7 +304,10 @@ class ParkingManager:
     def cargar_config(self):
         if not os.path.exists(self.config_file):
             self.config['TARIFAS'] = {'tarifa_carro': '4000', 'tarifa_moto': '2000'}
-            self.config['USUARIOS'] = {'admin': '1234|ADMIN'}
+            self.config['USUARIOS'] = {
+                'restaurantepikoteo@gmail.com': 'Cos2025+*|ADMIN|Michelle',
+                'coslogo@yahoo.com': 'Toby9610*|ADMIN|Constanza'
+            }
             self.config['METAS'] = {'diaria': '500000'}
             with open(self.config_file, 'w') as f: self.config.write(f)
         else:
@@ -308,6 +363,13 @@ class ParkingManager:
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
         cursor.execute("UPDATE cierres SET estado = 'ELIMINADO' WHERE rowid = ?", (id_c,))
         self.registrar_auditoria(cursor, admin, "ELIMINAR_CAJA", f"ID: {id_c}"); conn.commit(); conn.close(); return True
+
+    def vaciar_papelera_cierres(self, admin):
+        conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
+        cursor.execute("DELETE FROM cierres WHERE estado = 'ELIMINADO'")
+        self.registrar_auditoria(cursor, admin, "VACIAR_PAPELERA", "Eliminación permanente de cierres en papelera")
+        conn.commit(); conn.close(); return True
+
     def recuperar_cierre(self, id_c, admin):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
         cursor.execute("UPDATE cierres SET estado = 'ACTIVO' WHERE rowid = ?", (id_c,))
@@ -357,20 +419,24 @@ class ParkingManager:
         cursor.execute("SELECT * FROM tickets WHERE estado = 'PAGADO'")
         all_pagados = [dict(r) for r in cursor.fetchall()]
 
+        # Lista base para estadísticas: si hay filtro de usuario, solo sus tickets; si no, todos.
+        base_stats = all_pagados
+        if usuario_filtro:
+            base_stats = [t for t in all_pagados if str(t['usuario_pago']).strip().lower() == str(usuario_filtro).strip().lower()]
+
         d_obj = self.parse_fecha(desde)
         h_obj = datetime.datetime.now() if hasta == 'EN CURSO' else self.parse_fecha(hasta)
         if len(str(hasta)) <= 10 and h_obj != datetime.datetime(1900,1,1):
             h_obj = h_obj.replace(hour=23, minute=59, second=59)
 
-        filtrados = [t for t in all_pagados if d_obj <= self.parse_fecha(t['salida']) <= h_obj]
-        if usuario_filtro:
-            filtrados = [t for t in filtrados if str(t['usuario_pago']).strip().lower() == str(usuario_filtro).strip().lower()]
+        # 'filtrados' son los tickets que entran en el rango de fecha seleccionado para las tarjetas inferiores
+        filtrados = [t for t in base_stats if d_obj <= self.parse_fecha(t['salida']) <= h_obj]
 
         ahora = datetime.datetime.now()
 
-        # Cálculos de periodos para metas
+        # Cálculos de periodos para metas (usan base_stats para respetar el filtro)
         def get_total_periodo(inicio, fin):
-            return sum(t['valor'] for t in all_pagados if inicio <= self.parse_fecha(t['salida']) <= fin)
+            return sum(float(t['valor']) for t in base_stats if inicio <= self.parse_fecha(t['salida']) <= fin)
 
         # Diario (Hoy)
         inicio_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -388,18 +454,58 @@ class ParkingManager:
         inicio_anio = ahora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         total_anio = get_total_periodo(inicio_anio, ahora)
 
-        # Historial 7 días para el gráfico de barras
-        fin_7 = h_obj
+        # Historial 7 días para el gráfico de barras (usando base_stats para respetar el filtro)
+        fin_7 = h_obj if h_obj else ahora
         inicio_7 = (fin_7 - datetime.timedelta(days=6)).replace(hour=0, minute=0, second=0)
         ultimos_7_dias = {}
         for i in range(7):
             fecha_d = (inicio_7 + datetime.timedelta(days=i)).strftime("%Y-%m-%d")
             ultimos_7_dias[fecha_d] = 0.0
-        for t in all_pagados:
+        for t in base_stats:
             ts = self.parse_fecha(t['salida'])
             if inicio_7 <= ts <= fin_7:
                 dk = ts.strftime("%Y-%m-%d");
-                if dk in ultimos_7_dias: ultimos_7_dias[dk] += t['valor']
+                if dk in ultimos_7_dias: ultimos_7_dias[dk] += float(t['valor'])
+
+        res = {
+            "conteos": {"CARRO": 0, "MOTO": 0},
+            "dinero": {"CARRO": 0.0, "MOTO": 0.0},
+            "por_hora": {},
+            "max_hora": {"hora": None, "valor": 0},
+            "min_hora": {"hora": None, "valor": float('inf')},
+            "promedios": {"diario": 0, "ticket": 0},
+            "historial_7_dias": ultimos_7_dias,
+            "dashboard_metas": {
+                "hoy": {"total": total_hoy, "meta": float(self.config.get('METAS', 'diaria', fallback=500000))},
+                "semana": {"total": total_semana, "meta": float(self.config.get('METAS', 'semanal', fallback=3000000))},
+                "mes": {"total": total_mes, "meta": float(self.config.get('METAS', 'mensual', fallback=12000000))},
+                "anio": {"total": total_anio, "meta": float(self.config.get('METAS', 'anual', fallback=140000000))}
+            }
+        }
+
+        for h in range(24): res["por_hora"][h] = {"CARRO": 0, "MOTO": 0, "cnt_c": 0, "cnt_m": 0}
+        for t in filtrados:
+            tipo, valor = t['tipo'], float(t['valor'])
+            res["conteos"][tipo] += 1
+            res["dinero"][tipo] += valor
+            h_salida = self.parse_fecha(t['salida']).hour
+            res["por_hora"][h_salida][tipo] += valor
+            if tipo == "CARRO": res["por_hora"][h_salida]["cnt_c"] += 1
+            else: res["por_hora"][h_salida]["cnt_m"] += 1
+
+        suma_total = res["dinero"]["CARRO"] + res["dinero"]["MOTO"]
+        for h, data in res["por_hora"].items():
+            total_h = data["CARRO"] + data["MOTO"]
+            if total_h > 0:
+                if total_h > res["max_hora"]["valor"]: res["max_hora"] = {"hora": h, "valor": total_h}
+                if total_h < res["min_hora"]["valor"]: res["min_hora"] = {"hora": h, "valor": total_h}
+
+        if res["min_hora"]["valor"] == float('inf'): res["min_hora"]["valor"] = 0
+        res["promedios"]["ticket"] = suma_total / len(filtrados) if len(filtrados) > 0 else 0
+        diff_days = (h_obj - d_obj).days + 1
+        res["promedios"]["diario"] = suma_total / diff_days if diff_days > 0 else suma_total
+
+        conn.close(); return res
 
         res = {
             "conteos": {"CARRO": 0, "MOTO": 0},

@@ -22,6 +22,10 @@ def login():
                 session['role'] = parts[1]
                 session['name'] = parts[2] if len(parts) > 2 else u
                 return redirect('/')
+
+        # Si llegamos aquí, las credenciales son incorrectas
+        return render_template('login.html', error="Usuario o contraseña incorrectos")
+
     return render_template('login.html')
 
 @app.route('/logout')
@@ -32,21 +36,6 @@ def logout():
 def caja_estado():
     u = request.args.get('usuario') or session.get('user')
     res = manager.get_estado_caja(u)
-
-    # Mejora para ADMIN: Si su caja está cerrada, buscar si hay alguna otra abierta para supervisar
-    if res['estado'] == 'CERRADA' and session.get('role') == 'ADMIN' and not request.args.get('usuario'):
-        todas = manager.get_reporte_cierres()
-        abierta = next((c for c in todas if not c['fecha_cierre']), None)
-        if abierta:
-            res = {
-                'estado': 'ABIERTA',
-                'id': abierta['id'],
-                'usuario': abierta['usuario'],
-                'base': abierta['base'],
-                'fecha_apertura': abierta['fecha_apertura'],
-                'supervisando': True
-            }
-
     res['valores_actuales'] = manager.get_valores_actuales(res['usuario'])
     return jsonify(res)
 
@@ -77,13 +66,6 @@ def caja_cerrar():
 def api_ingreso():
     data = request.json
     usuario_operativo = session['user']
-    if session['role'] == 'ADMIN':
-        res_estado = manager.get_estado_caja(session['user'])
-        if res_estado['estado'] == 'CERRADA':
-            todas = manager.get_reporte_cierres()
-            abierta = next((c for c in todas if not c['fecha_cierre']), None)
-            if abierta: usuario_operativo = abierta['usuario']
-
     res = manager.registrar_ingreso(data['placa'], data['tipo'], usuario_operativo)
     if isinstance(res, dict) and res.get('status') == 'ok':
         return jsonify({"status": "ok", "msg": res['msg'], "datos": res['datos'], "activos": manager.get_tickets_activos()})
@@ -93,13 +75,6 @@ def api_ingreso():
 def api_salida():
     data = request.json
     usuario_operativo = session['user']
-    if session['role'] == 'ADMIN':
-        res_estado = manager.get_estado_caja(session['user'])
-        if res_estado['estado'] == 'CERRADA':
-            todas = manager.get_reporte_cierres()
-            abierta = next((c for c in todas if not c['fecha_cierre']), None)
-            if abierta: usuario_operativo = abierta['usuario']
-
     res = manager.registrar_salida(data['placa'], data['medio'], usuario_operativo)
     res['activos'] = manager.get_tickets_activos()
     return jsonify(res)
@@ -120,25 +95,46 @@ def api_reportes_recuperar():
     manager.recuperar_cierre(request.json['id'], session['user'])
     return jsonify({"status": "ok"})
 
-@app.route('/api/usuarios', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/reportes/vaciar', methods=['POST'])
+def api_reportes_vaciar():
+    if session.get('role') != 'ADMIN': return jsonify({"status": "error"}), 403
+    manager.vaciar_papelera_cierres(session['user'])
+    return jsonify({"status": "ok"})
+
+@app.route('/api/usuarios', methods=['GET', 'DELETE'])
 def api_usuarios():
     if session.get('role') != 'ADMIN': return jsonify({"status": "error", "msg": "No autorizado"}), 403
 
-    if request.method == 'POST':
-        data = request.json
-        u, p, r, n = data['username'].lower().strip(), data['password'], data['role'], data.get('name', '')
-        if manager.get_usuario_info(u): return jsonify({"status": "error", "msg": "Existe"}), 400
-        manager.config['USUARIOS'][u] = f"{p}|{r}|{n}"
-        manager.save_config()
-        return jsonify({"status": "ok"})
-
     if request.method == 'DELETE':
-        u = request.args.get('username').lower().strip()
-        if u == 'admin' or u == session.get('user').lower(): return jsonify({"status": "error"}), 400
-        if u in manager.config['USUARIOS']:
-            del manager.config['USUARIOS'][u]
+        u_to_del = request.args.get('username').lower().strip()
+        current_u = session.get('user').lower()
+        admins_principales = ['restaurantepikoteo@gmail.com', 'coslogo@yahoo.com']
+
+        # Los administradores principales son intocables
+        if u_to_del in admins_principales:
+            return jsonify({"status": "error", "msg": "Este administrador principal no puede ser eliminado."}), 400
+
+        # Un usuario no puede eliminarse a sí mismo
+        if u_to_del == current_u:
+            return jsonify({"status": "error", "msg": "No puedes eliminar tu propio usuario."}), 400
+
+        # Obtener información del usuario a eliminar
+        info_to_del = manager.get_usuario_info(u_to_del)
+        if not info_to_del:
+            return jsonify({"status": "error", "msg": "Usuario no encontrado."}), 404
+
+        role_to_del = info_to_del.split('|')[1]
+
+        # REGLA DE ORO: Solo los admins principales pueden borrar otros ADMINS
+        if role_to_del == 'ADMIN' and current_u not in admins_principales:
+            return jsonify({"status": "error", "msg": "Solo un administrador principal puede eliminar a otros administradores."}), 403
+
+        if u_to_del in manager.config['USUARIOS']:
+            del manager.config['USUARIOS'][u_to_del]
             manager.save_config()
-        return jsonify({"status": "ok"})
+            return jsonify({"status": "ok"})
+
+        return jsonify({"status": "error", "msg": "Error al procesar la solicitud."}), 500
 
     res = []
     for u in manager.config['USUARIOS']:
@@ -150,9 +146,48 @@ def api_usuarios():
         })
     return jsonify(res)
 
+@app.route('/api/solicitudes', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def api_solicitudes():
+    if request.method == 'POST':
+        data = request.json
+        if manager.solicitar_registro(data['name'], data['username'], data['password'], data['role']):
+            return jsonify({"status": "ok"})
+        return jsonify({"status": "error", "msg": "El correo ya tiene una solicitud pendiente o ya existe."}), 400
+
+    # Para GET, PUT y DELETE se requiere ser admin principal
+    admins_principales = ['restaurantepikoteo@gmail.com', 'coslogo@yahoo.com']
+    if session.get('user') not in admins_principales:
+        return jsonify({"status": "error", "msg": "No autorizado"}), 403
+
+    if request.method == 'GET':
+        return jsonify(manager.get_solicitudes_registro())
+
+    if request.method == 'PUT': # APROBAR
+        if manager.procesar_solicitud(request.json['id'], 'APROBAR', session['user']):
+            return jsonify({"status": "ok"})
+        return jsonify({"status": "error"}), 400
+
+    if request.method == 'DELETE': # RECHAZAR
+        if manager.procesar_solicitud(request.args.get('id'), 'RECHAZAR', session['user']):
+            return jsonify({"status": "ok"})
+        return jsonify({"status": "error"}), 400
+
+@app.route('/api/usuarios/cambiar_rol', methods=['POST'])
+def api_cambiar_rol():
+    admins_principales = ['restaurantepikoteo@gmail.com', 'coslogo@yahoo.com']
+    if session.get('user') not in admins_principales:
+        return jsonify({"status": "error", "msg": "Solo los administradores principales pueden cambiar roles."}), 403
+
+    data = request.json
+    if manager.cambiar_rol_usuario(data['username'], data['role'], session['user']):
+        return jsonify({"status": "ok"})
+    return jsonify({"status": "error"}), 400
+
 @app.route('/api/tickets/rango')
 def api_tickets_rango():
-    u = request.args.get('usuario') or session.get('user')
+    # Si viene el parámetro 'usuario' específicamente, filtramos por él.
+    # Si no viene (como en el modal de última hora), pasamos None para ver todos.
+    u = request.args.get('usuario')
     return jsonify(manager.get_tickets_rango(request.args.get('inicio'), request.args.get('fin'), u))
 
 @app.route('/api/ticket/<int:id_t>')

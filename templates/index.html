@@ -33,6 +33,7 @@
             <button class="menu-item" onclick="mostrarSeccion('auditoria')">Auditoría</button>
             <button class="menu-item" onclick="mostrarSeccion('tarifas')">Tarifas</button>
             <button class="menu-item" onclick="mostrarSeccion('usuarios')">Usuarios</button>
+            <button class="menu-item" id="btnMenuSolicitudes" style="display:none;" onclick="mostrarSeccion('solicitudes')">Solicitudes <span id="badgeSolicitudes" style="background:white; color:#b40000; padding:2px 6px; border-radius:10px; font-size:10px; margin-left:5px;">0</span></button>
             <button class="menu-item" onclick="mostrarSeccion('mensualidades')">Mensualidades</button>
             {% endif %}
         </div>
@@ -91,6 +92,7 @@
                             <input type="checkbox" id="chkIncluirEliminados" onchange="cargarReportes()"> Ver papelera
                         </label>
                         <button onclick="cargarReportes()" class="btn-loggro-red">Buscar</button>
+                        <button id="btnVaciarPapelera" onclick="vaciarPapelera()" class="btn-action btn-dark" style="height: 35px; padding: 0 15px; display: none; background: #666;">Vaciar Papelera</button>
                     </div>
                 </div>
                 <div style="text-align: right; margin-bottom: 10px;">
@@ -245,6 +247,15 @@
                             </div>
                         </div>
                     </div>
+                    <div class="dash-card" style="border-left: 5px solid #b40000;">
+                        <div class="dash-card-content">
+                            <div class="dash-circle" style="background: #b40000;"><span id="statCantTotalDash">0</span></div>
+                            <div class="dash-info">
+                                <span class="dash-label">Venta Total en Periodo</span>
+                                <span id="statDineroTotalDash" class="dash-value" style="font-size: 22px;">$0</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="charts-row">
@@ -338,44 +349,36 @@
             <div id="seccion-usuarios" class="seccion" style="display:none;">
                 <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 30px;">GESTIÓN DE USUARIOS</h2>
 
-                <div class="header-actions" style="flex-direction: column; background: white; padding: 25px; margin-bottom: 30px;">
-                    <h3 style="margin-top: 0; color: #555; font-size: 16px;">Registrar Nuevo Usuario</h3>
-                    <div class="filter-row" style="width: 100%; flex-wrap: wrap; gap: 15px;">
-                        <div class="input-group" style="flex: 1; min-width: 150px;">
-                            <label>Nombre Real</label>
-                            <input type="text" id="usrRealName" class="input-loggro" placeholder="Ej: Esteban">
-                        </div>
-                        <div class="input-group" style="flex: 1; min-width: 200px;">
-                            <label>Correo Electrónico</label>
-                            <input type="email" id="usrNombre" class="input-loggro" placeholder="ejemplo@correo.com">
-                        </div>
-                        <div class="input-group" style="flex: 1; min-width: 150px;">
-                            <label>Contraseña</label>
-                            <input type="password" id="usrClave" class="input-loggro" placeholder="******" autocomplete="new-password">
-                        </div>
-                        <div class="input-group" style="min-width: 150px;">
-                            <label>Rol</label>
-                            <select id="usrRol" class="select-loggro">
-                                <option value="OPERARIO">OPERARIO</option>
-                                <option value="ADMIN">ADMINISTRADOR</option>
-                            </select>
-                        </div>
-                        <button onclick="guardarUsuario()" class="btn-loggro-red" style="align-self: flex-end; height: 45px;">CREAR USUARIO</button>
-                    </div>
-                    <p style="font-size: 11px; color: #888; margin-top: 10px;">* El usuario debe ser un correo válido. La contraseña debe tener al menos 6 caracteres.</p>
-                </div>
-
                 <div class="table-container-loggro">
                     <table class="tabla-loggro">
                         <thead>
                             <tr>
                                 <th>Nombre</th>
                                 <th>Usuario (Correo)</th>
-                                <th>Rol</th>
+                                <th>Rol Actual</th>
+                                <th style="text-align: center;">Cambiar Rol</th>
                                 <th style="text-align: center;">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="tablaUsuariosCuerpo"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="seccion-solicitudes" class="seccion" style="display:none;">
+                <h2 style="text-align: center; letter-spacing: 2px; margin-bottom: 30px;">SOLICITUDES DE ACCESO</h2>
+                <div class="table-container-loggro">
+                    <table class="tabla-loggro">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Nombre</th>
+                                <th>Correo</th>
+                                <th>Rol Solicitado</th>
+                                <th style="text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaSolicitudesCuerpo"></tbody>
                     </table>
                 </div>
             </div>

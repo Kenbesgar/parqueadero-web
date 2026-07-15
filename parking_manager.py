@@ -100,17 +100,22 @@ class ParkingManager:
         caja = self.get_estado_caja(usuario)
         if caja['estado'] == 'CERRADA': return {'efectivo': 0, 'qr': 0, 'total': 0, 'cnt_ef': 0, 'cnt_qr': 0, 'descuentos': 0}
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        # Traemos todos los tickets pagados por el usuario y filtramos por fecha en Python para evitar errores de formato SQL
-        cursor.execute("SELECT valor, medio_pago, descuento, salida FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ?", (usuario,))
+        # Usamos COLLATE NOCASE para que no importe si el correo tiene mayúsculas en la DB
+        cursor.execute("SELECT valor, medio_pago, descuento, salida FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ? COLLATE NOCASE", (usuario,))
         ef, qr, cef, cqr, dtot = 0.0, 0.0, 0, 0, 0.0
         f_apertura = self.parse_fecha(caja['fecha_apertura'])
 
         for row in cursor.fetchall():
             f_salida = self.parse_fecha(row[3])
+            # Comparamos la fecha de salida con la de apertura de la caja actual
             if f_salida >= f_apertura:
-                dtot += row[2]
-                if row[1] == 'QR': qr += row[0]; cqr += 1
-                else: ef += row[0]; cef += 1
+                dtot += float(row[2])
+                if row[1] == 'QR':
+                    qr += float(row[0])
+                    cqr += 1
+                else:
+                    ef += float(row[0])
+                    cef += 1
         conn.close(); return {'efectivo': ef, 'qr': qr, 'cnt_ef': cef, 'cnt_qr': cqr, 'total': ef + qr, 'descuentos': dtot}
 
     def cerrar_caja(self, ef_dig, qr_dig, usuario_caja):
@@ -151,13 +156,16 @@ class ParkingManager:
         return {"status": "ok", "msg": "Ingreso registrado correctamente.", "datos": {"id": t_id, "placa": placa, "tipo": tipo_final, "ingreso": ahora}}
 
     def registrar_salida(self, placa, medio, usuario):
+        usuario = usuario.lower().strip()
         if self.get_estado_caja(usuario)['estado'] == 'CERRADA': return {"status": "error", "msg": "Caja cerrada."}
         placa = placa.upper().strip()
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
-        cursor.execute("SELECT rowid as id_pk, * FROM tickets WHERE placa = ? AND estado = 'ACTIVO' ORDER BY id DESC", (placa,))
+        # Buscamos por id en lugar de rowid para mayor precisión
+        cursor.execute("SELECT * FROM tickets WHERE placa = ? AND estado = 'ACTIVO' ORDER BY id DESC", (placa,))
         row = cursor.fetchone()
         if not row: conn.close(); return {"status": "error", "msg": "No encontrado."}
 
+        t_id = row['id']
         t_in = self.parse_fecha(row['ingreso'])
         t_out = self.ahora()
         mins = int((t_out - t_in).total_seconds() / 60)
@@ -171,10 +179,10 @@ class ParkingManager:
             else: hrs = float(h + 1)
 
         total = hrs * tarifa; ahora_str = t_out.strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("UPDATE tickets SET salida = ?, valor = ?, estado = 'PAGADO', medio_pago = ?, usuario_pago = ? WHERE rowid = ?", (ahora_str, total, medio, usuario, row['id_pk']))
+        cursor.execute("UPDATE tickets SET salida = ?, valor = ?, estado = 'PAGADO', medio_pago = ?, usuario_pago = ? WHERE id = ?", (ahora_str, total, medio, usuario, t_id))
         self.registrar_auditoria(cursor, usuario, "SALIDA", f"Placa: {placa} | Valor: {total}")
         conn.commit(); conn.close()
-        return {"status": "ok", "texto": "PAGO", "datos": {"id": row['id'], "placa": placa, "tipo": row['tipo'], "ingreso": row['ingreso'], "salida": ahora_str, "minutos": mins, "medio": medio, "total": total}}
+        return {"status": "ok", "texto": "PAGO", "datos": {"id": t_id, "placa": placa, "tipo": row['tipo'], "ingreso": row['ingreso'], "salida": ahora_str, "minutos": mins, "medio": medio, "total": total}}
 
     def get_tickets_activos(self):
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
@@ -184,16 +192,18 @@ class ParkingManager:
         conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
         t_i = self.parse_fecha(inicio)
         t_f = self.ahora() if fin == 'EN CURSO' else self.parse_fecha(fin)
+        # Añadimos un pequeño margen al fin para asegurar que entren los segundos exactos
+        if fin != 'EN CURSO': t_f = t_f + datetime.timedelta(seconds=1)
 
         if usuario:
-            query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?)"
+            query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?) COLLATE NOCASE"
             cursor.execute(query, (usuario, usuario))
         else:
             query = "SELECT * FROM tickets"
             cursor.execute(query)
 
         all_t = [dict(r) for r in cursor.fetchall()]
-        res = [t for t in all_t if (t_i <= self.parse_fecha(t['ingreso']) <= t_f) or (t['salida'] != 'N/A' and t_i <= self.parse_fecha(t['salida']) <= t_f)]
+        res = [t for t in all_t if (t_i <= self.parse_fecha(t['ingreso']) <= t_f) or (t['salida'] != 'N/A' and t['salida'] is not None and t_i <= self.parse_fecha(t['salida']) <= t_f)]
         conn.close(); return res
 
     def parse_fecha(self, f):

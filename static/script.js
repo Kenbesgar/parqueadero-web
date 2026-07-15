@@ -172,13 +172,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.fecha_cierre) {
             inEf.value = data.vts_ef_dig;
             inQr.value = data.vts_qr_dig;
-            const t = data.vts_ef_dig + data.vts_qr_dig;
+            const t = (parseFloat(data.vts_ef_dig) || 0) + (parseFloat(data.vts_qr_dig) || 0);
             document.getElementById('txtTotalLoggro').textContent = `$ ${t.toLocaleString()}`;
         } else {
-            inEf.value = data.valores_actuales.efectivo;
-            inQr.value = data.valores_actuales.qr;
-            const t = data.valores_actuales.efectivo + data.valores_actuales.qr;
-            document.getElementById('txtTotalLoggro').textContent = `$ ${t.toLocaleString()}`;
+            // Para cajas abiertas, dejamos que el usuario digite desde cero para evitar confusiones
+            inEf.value = '';
+            inQr.value = '';
+            document.getElementById('txtTotalLoggro').textContent = '$ 0';
         }
 
         document.getElementById('modalCuadre').style.display = 'block';

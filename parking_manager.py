@@ -24,11 +24,13 @@ class ParkingManager:
 
     def inicializar_base_de_datos(self):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, placa TEXT, tipo TEXT, ingreso TEXT, salida TEXT, valor REAL, estado TEXT, descuento REAL DEFAULT 0, motivo_descuento TEXT DEFAULT '', medio_pago TEXT DEFAULT 'EFECTIVO', usuario_pago TEXT, usuario_ingreso TEXT)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, placa TEXT, tipo TEXT, ingreso TEXT, salida TEXT, valor REAL, estado TEXT, descuento REAL DEFAULT 0, motivo_descuento TEXT DEFAULT '', medio_pago TEXT DEFAULT 'EFECTIVO', usuario_pago TEXT, usuario_ingreso TEXT, id_cierre INTEGER)")
         cursor.execute("CREATE TABLE IF NOT EXISTS cierres (usuario TEXT, fecha_apertura TEXT, fecha_cierre TEXT, base REAL, vts_ef_sis REAL DEFAULT 0, vts_qr_sis REAL DEFAULT 0, vts_ef_dig REAL DEFAULT 0, vts_qr_dig REAL DEFAULT 0, cnt_ef_sis INTEGER DEFAULT 0, cnt_qr_sis INTEGER DEFAULT 0, estado TEXT DEFAULT 'ACTIVO')")
         cursor.execute("CREATE TABLE IF NOT EXISTS auditoria (usuario TEXT, accion TEXT, detalle TEXT, fecha TEXT)")
         cursor.execute("CREATE TABLE IF NOT EXISTS mensualidades (placa TEXT PRIMARY KEY, cliente TEXT, fecha_inicio TEXT, fecha_fin TEXT, valor_pagado REAL)")
         cursor.execute("CREATE TABLE IF NOT EXISTS solicitudes_registro (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, correo TEXT UNIQUE, password TEXT, role TEXT, fecha TEXT)")
+        try: cursor.execute("ALTER TABLE tickets ADD COLUMN id_cierre INTEGER")
+        except: pass
         try: cursor.execute("ALTER TABLE tickets ADD COLUMN usuario_ingreso TEXT")
         except: pass
         try: cursor.execute("ALTER TABLE tickets ADD COLUMN usuario_pago TEXT")
@@ -100,22 +102,18 @@ class ParkingManager:
         caja = self.get_estado_caja(usuario)
         if caja['estado'] == 'CERRADA': return {'efectivo': 0, 'qr': 0, 'total': 0, 'cnt_ef': 0, 'cnt_qr': 0, 'descuentos': 0}
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
-        # Usamos COLLATE NOCASE para que no importe si el correo tiene mayúsculas en la DB
-        cursor.execute("SELECT valor, medio_pago, descuento, salida FROM tickets WHERE estado = 'PAGADO' AND usuario_pago = ? COLLATE NOCASE", (usuario,))
+        # Filtramos estrictamente por el ID de la caja actual para evitar solapamientos por hora
+        cursor.execute("SELECT valor, medio_pago, descuento FROM tickets WHERE estado = 'PAGADO' AND id_cierre = ?", (caja['id'],))
         ef, qr, cef, cqr, dtot = 0.0, 0.0, 0, 0, 0.0
-        f_apertura = self.parse_fecha(caja['fecha_apertura'])
 
         for row in cursor.fetchall():
-            f_salida = self.parse_fecha(row[3])
-            # Comparamos la fecha de salida con la de apertura de la caja actual
-            if f_salida >= f_apertura:
-                dtot += float(row[2])
-                if row[1] == 'QR':
-                    qr += float(row[0])
-                    cqr += 1
-                else:
-                    ef += float(row[0])
-                    cef += 1
+            dtot += float(row[2])
+            if row[1] == 'QR':
+                qr += float(row[0])
+                cqr += 1
+            else:
+                ef += float(row[0])
+                cef += 1
         conn.close(); return {'efectivo': ef, 'qr': qr, 'cnt_ef': cef, 'cnt_qr': cqr, 'total': ef + qr, 'descuentos': dtot}
 
     def cerrar_caja(self, ef_dig, qr_dig, usuario_caja):
@@ -178,7 +176,10 @@ class ParkingManager:
             else: hrs = float(h + 1)
 
         total = hrs * tarifa; ahora_str = t_out.strftime("%d/%m/%Y %H:%M:%S")
-        cursor.execute("UPDATE tickets SET salida = ?, valor = ?, estado = 'PAGADO', medio_pago = ?, usuario_pago = ? WHERE id = ?", (ahora_str, total, medio, usuario, t_id))
+        caja_actual = self.get_estado_caja(usuario)
+        id_caja = caja_actual['id'] if caja_actual['estado'] == 'ABIERTA' else None
+
+        cursor.execute("UPDATE tickets SET salida = ?, valor = ?, estado = 'PAGADO', medio_pago = ?, usuario_pago = ?, id_cierre = ? WHERE id = ?", (ahora_str, total, medio, usuario, id_caja, t_id))
         self.registrar_auditoria(cursor, usuario, "SALIDA", f"Placa: {placa} | Valor: {total}")
         conn.commit(); conn.close()
         return {"status": "ok", "texto": "PAGO", "datos": {"id": t_id, "placa": placa, "tipo": row['tipo'], "ingreso": row['ingreso'], "salida": ahora_str, "minutos": mins, "medio": medio, "total": total}}

@@ -18,6 +18,11 @@ class ParkingManager:
         self.cargar_config()
         self.cargar_sesion()
 
+    def ahora(self):
+        # Ajuste para Colombia (UTC-5)
+        # Esto asegura que en PythonAnywhere la hora sea la correcta
+        return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
+
     def inicializar_base_de_datos(self):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
         cursor.execute("CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, placa TEXT, tipo TEXT, ingreso TEXT, salida TEXT, valor REAL, estado TEXT, descuento REAL DEFAULT 0, motivo_descuento TEXT DEFAULT '', medio_pago TEXT DEFAULT 'EFECTIVO', usuario_pago TEXT, usuario_ingreso TEXT)")

@@ -194,6 +194,13 @@ def api_tickets_rango():
 def api_get_ticket(id_t):
     return jsonify(manager.get_ticket_by_id(id_t))
 
+@app.route('/api/ticket/descuento', methods=['POST'])
+def api_ticket_descuento():
+    if session.get('role') != 'ADMIN': return jsonify({"status": "error", "msg": "No autorizado"}), 403
+    data = request.json
+    res = manager.aplicar_descuento_manual(data['id'], data['monto'], data['motivo'], session['user'])
+    return jsonify(res)
+
 @app.route('/api/auditoria')
 def api_auditoria():
     return jsonify(manager.get_auditoria())

@@ -380,9 +380,15 @@ class ParkingManager:
         return res
 
     def eliminar_cierre(self, id_c, admin):
-        conn = sqlite3.connect(self.db_path); cursor = conn.cursor()
+        conn = sqlite3.connect(self.db_path); conn.row_factory = sqlite3.Row; cursor = conn.cursor()
+        cursor.execute("SELECT fecha_cierre FROM cierres WHERE rowid = ?", (id_c,))
+        row = cursor.fetchone()
+        if row and (not row['fecha_cierre'] or row['fecha_cierre'] == ''):
+            conn.close(); return False # No se puede eliminar una caja abierta
+
         cursor.execute("UPDATE cierres SET estado = 'ELIMINADO' WHERE rowid = ?", (id_c,))
-        self.registrar_auditoria(cursor, admin, "ELIMINAR_CAJA", f"ID: {id_c}"); conn.commit(); conn.close(); return True
+        self.registrar_auditoria(cursor, admin, "ELIMINAR_CAJA", f"ID: {id_c}")
+        conn.commit(); conn.close(); return True
 
     def vaciar_papelera_cierres(self, admin):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()

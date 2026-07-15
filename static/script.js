@@ -341,13 +341,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const yaEsta = lista.find(x => x.fecha_apertura === est.fecha_apertura && x.usuario === est.usuario);
             if(!yaEsta) lista.unshift({ id: 'ACTIVA', fecha_apertura: est.fecha_apertura, fecha_cierre: '', usuario: est.usuario, base: est.base });
         }
-        tbody.innerHTML = lista.map(r => `<tr class="${!r.fecha_cierre ? 'fila-abierta' : ''} ${r.estado === 'ELIMINADO' ? 'fila-eliminada' : ''}"><td>${r.id}</td><td>${r.fecha_apertura}</td><td>${r.fecha_cierre || 'EN CURSO'}</td><td>${usersMap[r.usuario.toLowerCase()] || r.usuario}</td><td>$${Number(r.base).toLocaleString()}</td><td>${r.fecha_cierre ? 'Si' : 'No'}</td><td style="display:flex; gap:5px;"><button class="btn-loggro-red" onclick="${!r.fecha_cierre ? `abrirPorId('${r.usuario}')` : `verResumenCierre('${r.id}')`}">${!r.fecha_cierre ? 'Cerrar' : 'Ver'}</button><button class="btn-ver-facturas" onclick="verFacturasCaja('${r.fecha_apertura}', '${r.fecha_cierre || 'EN CURSO'}', '${r.usuario}')">Fac.</button>${userRole === 'ADMIN' && r.id !== 'ACTIVA' ? (r.estado === 'ELIMINADO' ? `<button class="btn-icon-loggro" onclick="recuperarCaja('${r.id}')">🔄</button>` : `<button class="btn-icon-loggro" onclick="eliminarCaja('${r.id}')">🗑️</button>`) : ''}</td></tr>`).join('');
+        tbody.innerHTML = lista.map(r => `
+            <tr class="${!r.fecha_cierre ? 'fila-abierta' : ''} ${r.estado === 'ELIMINADO' ? 'fila-eliminada' : ''}">
+                <td>${r.id}</td>
+                <td>${r.fecha_apertura}</td>
+                <td>${r.fecha_cierre || 'EN CURSO'}</td>
+                <td>${usersMap[r.usuario.toLowerCase()] || r.usuario}</td>
+                <td>$${Number(r.base).toLocaleString()}</td>
+                <td>${r.fecha_cierre ? 'Si' : 'No'}</td>
+                <td style="display:flex; gap:5px;">
+                    <button class="btn-loggro-red" onclick="${!r.fecha_cierre ? `abrirPorId('${r.usuario}')` : `verResumenCierre('${r.id}')`}">${!r.fecha_cierre ? 'Cerrar' : 'Ver'}</button>
+                    <button class="btn-ver-facturas" onclick="verFacturasCaja('${r.fecha_apertura}', '${r.fecha_cierre || 'EN CURSO'}', '${r.usuario}')">Fac.</button>
+                    ${userRole === 'ADMIN' && r.id !== 'ACTIVA' ?
+                        (r.estado === 'ELIMINADO' ?
+                            `<button class="btn-icon-loggro" onclick="recuperarCaja('${r.id}')" title="Recuperar">🔄</button>` :
+                            (r.fecha_cierre ? `<button class="btn-icon-loggro" onclick="eliminarCaja('${r.id}')" title="Eliminar">🗑️</button>` : '')
+                        ) : ''
+                    }
+                </td>
+            </tr>`).join('');
     };
 
     window.eliminarCaja = async (id) => {
         if (!confirm('¿Seguro que desea eliminar este cuadre de caja?')) return;
         const res = await fetch('/api/reportes/eliminar', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id }) });
-        if ((await res.json()).status === 'ok') cargarReportes();
+        const data = await res.json();
+        if (data.status === 'ok') cargarReportes();
+        else alert(data.msg || 'No se puede eliminar una caja que aún está abierta.');
     };
 
     window.recuperarCaja = async (id) => {

@@ -1,11 +1,8 @@
 import sqlite3
 import datetime
-import pytz
 import configparser
 import os
 import re
-
-TZ_COLOMBIA = pytz.timezone('America/Bogota')
 
 class ParkingManager:
     def __init__(self, db_path="parqueadero.db"):
@@ -22,10 +19,8 @@ class ParkingManager:
         self.cargar_sesion()
 
     def ahora(self):
-        # Ajuste exacto para Colombia usando pytz.
-        # Convierte la hora local a un objeto sin información de zona horaria (naive)
-        # para que se compare y guarde sin problemas en SQLite.
-        return datetime.datetime.now(TZ_COLOMBIA).replace(tzinfo=None)
+        # Ajuste para Colombia (UTC-5) sin librerías externas
+        return datetime.datetime.utcnow() - datetime.timedelta(hours=5)
 
     def inicializar_base_de_datos(self):
         conn = sqlite3.connect(self.db_path); cursor = conn.cursor()

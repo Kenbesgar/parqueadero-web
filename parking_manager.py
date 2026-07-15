@@ -140,7 +140,6 @@ class ParkingManager:
         conn.commit(); conn.close(); return {"status": "ok", "msg": "Aplicado"}
 
     def registrar_ingreso(self, placa, tipo, usuario):
-        if self.get_estado_caja(usuario)['estado'] == 'CERRADA': return "ERROR: No tiene caja abierta."
         placa = placa.upper().strip().replace(" ", "")
         import re
         es_carro = re.match(r"^[A-Z]{3}\d{3}$", placa); es_moto = re.match(r"^[A-Z]{3}\d{2}[A-Z]{1,2}X?$", placa)
@@ -196,14 +195,18 @@ class ParkingManager:
         if fin != 'EN CURSO': t_f = t_f + datetime.timedelta(seconds=1)
 
         if usuario:
-            query = "SELECT * FROM tickets WHERE (usuario_ingreso = ? OR usuario_pago = ?) COLLATE NOCASE"
-            cursor.execute(query, (usuario, usuario))
+            # Si se pide un usuario, es para un cuadre de caja: solo importan los COBROS realizados por él
+            query = "SELECT * FROM tickets WHERE usuario_pago = ? COLLATE NOCASE"
+            cursor.execute(query, (usuario,))
+            all_t = [dict(r) for r in cursor.fetchall()]
+            res = [t for t in all_t if (t['salida'] != 'N/A' and t['salida'] is not None and t_i <= self.parse_fecha(t['salida']) <= t_f)]
         else:
+            # Si no hay usuario, es para consulta general (ej. última hora): vemos todo
             query = "SELECT * FROM tickets"
             cursor.execute(query)
+            all_t = [dict(r) for r in cursor.fetchall()]
+            res = [t for t in all_t if (t_i <= self.parse_fecha(t['ingreso']) <= t_f) or (t['salida'] != 'N/A' and t['salida'] is not None and t_i <= self.parse_fecha(t['salida']) <= t_f)]
 
-        all_t = [dict(r) for r in cursor.fetchall()]
-        res = [t for t in all_t if (t_i <= self.parse_fecha(t['ingreso']) <= t_f) or (t['salida'] != 'N/A' and t['salida'] is not None and t_i <= self.parse_fecha(t['salida']) <= t_f)]
         conn.close(); return res
 
     def parse_fecha(self, f):

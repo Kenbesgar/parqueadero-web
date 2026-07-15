@@ -58,14 +58,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (estaAbierta) {
                 labelEstadoCaja.textContent = `ABIERTA - ${data.usuario}`;
                 labelEstadoCaja.className = 'badge-caja badge-abierta';
-                btnIngresar.disabled = false;
                 btnSalida.disabled = false;
             } else {
                 labelEstadoCaja.textContent = 'CERRADA';
                 labelEstadoCaja.className = 'badge-caja badge-cerrada';
-                btnIngresar.disabled = true;
                 btnSalida.disabled = true;
             }
+
+            // El botón de ingresar siempre está habilitado si hay sesión iniciada
+            btnIngresar.disabled = false;
 
             const canManage = (userRole === 'ADMIN');
             labelEstadoCaja.onclick = canManage ? () => gestionarCaja() : null;
@@ -126,14 +127,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.abrirModalApertura = async () => {
+        if (userRole !== 'ADMIN') return;
+        const usersRes = await fetch('/api/usuarios');
+        const users = await usersRes.json();
+        document.getElementById('aperturaUsuario').innerHTML = users.map(u => `<option value="${u.username}" ${u.username.toLowerCase()===currentUser.toLowerCase()?'selected':''}>${u.name}</option>`).join('');
+        document.getElementById('modalApertura').style.display = 'block';
+    };
+
     window.gestionarCaja = async () => {
         if (userRole !== 'ADMIN') return;
         const data = await checkEstadoCaja();
         if (data.estado === 'CERRADA') {
-            const usersRes = await fetch('/api/usuarios');
-            const users = await usersRes.json();
-            document.getElementById('aperturaUsuario').innerHTML = users.map(u => `<option value="${u.username}" ${u.username.toLowerCase()===currentUser.toLowerCase()?'selected':''}>${u.name}</option>`).join('');
-            document.getElementById('modalApertura').style.display = 'block';
+            abrirModalApertura();
         } else {
             if (userRole === 'ADMIN' || data.usuario.toLowerCase() === currentUser.toLowerCase()) abrirModalCierreLoggro(data);
         }

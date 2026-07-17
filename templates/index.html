@@ -65,6 +65,7 @@
                                 <th>Placa</th>
                                 <th>Tipo</th>
                                 <th>Ingreso</th>
+                                <th style="text-align: center;">Acción</th>
                             </tr>
                         </thead>
                         <tbody id="tablaCuerpo">
@@ -74,6 +75,9 @@
                                 <td>{{ t.placa }}</td>
                                 <td>{{ t.tipo }}</td>
                                 <td>{{ t.ingreso }}</td>
+                                <td style="text-align: center;">
+                                    <button class="btn-icon-loggro" onclick="reimprimirTicket('{{ t.id }}')" title="Reimprimir Ticket de Ingreso">🖨️</button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
